@@ -1,3 +1,6 @@
+import os
+
+from PIL import Image
 import pytest
 from django.contrib.auth import get_user_model
 
@@ -54,6 +57,21 @@ def authenticated_client(test_user):
     client = APIClient()
     client.force_authenticate(test_user)
     return client
+
+
+@pytest.fixture
+def image_upload_url():
+    def _generate_image_upload_url(recipe_id):
+        return reverse("recipe:recipe-upload-image", args=[recipe_id])
+
+    return _generate_image_upload_url
+
+
+@pytest.fixture
+def sample_recipe1(test_user):
+    recipe = sample_recipe(user=test_user)
+    yield recipe
+    recipe.image.delete()
 
 
 # HELPER FUNCTIONS
@@ -211,3 +229,35 @@ class TestPrivateRecipeAPI(object):
             assert value == getattr(recipe, key)
 
         assert recipe.tags.all().count() == 0
+
+
+class TestRecipeImageUpload(object):
+    def test_upload_image_to_recipe(
+        self, sample_recipe1, authenticated_client, image_upload_url, tmp_path
+    ):
+        """Test uploading image to recipe"""
+        url = image_upload_url(sample_recipe1.id)
+        ntf = tmp_path / "test.jpg"
+        img = Image.new("RGB", (10, 10))
+        with ntf.open("wb") as the_image:
+            img.save(the_image, format="JPEG")
+
+        with ntf.open("rb") as the_image:
+            res = authenticated_client.post(
+                url, {"image": the_image}, format="multipart"
+            )
+
+        sample_recipe1.refresh_from_db()
+
+        assert res.status_code == status.HTTP_200_OK
+        assert "image" in res.data
+        assert os.path.exists(sample_recipe1.image.path)
+
+    def test_upload_image_bad_request(
+        self, authenticated_client, sample_recipe1, image_upload_url
+    ):
+        """Test uploading an invalid image"""
+        url = image_upload_url(sample_recipe1.id)
+        res = authenticated_client.post(url, {"image": "notimage"}, format="multipart")
+
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
