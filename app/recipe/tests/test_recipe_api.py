@@ -2,16 +2,14 @@ import os
 
 from PIL import Image
 import pytest
-from django.contrib.auth import get_user_model
 
 # from django.test import TestCase
 
 from django.urls import reverse
 
-from rest_framework.test import APIClient
 from rest_framework import status
 
-from core.models import Recipe, Tag, Ingredient
+from core.models import Recipe
 
 from recipe.serializers import RecipeSerializer, RecipeDetailSerializer
 
@@ -34,112 +32,11 @@ def detail_url():
 
 
 @pytest.fixture
-def public_client():
-    return APIClient()
-
-
-@pytest.fixture
-def test_user():
-    return get_user_model().objects.create_user(
-        "barack@whitehouse.gov", "The 44th President"
-    )
-
-
-@pytest.fixture
-def test_user2():
-    return get_user_model().objects.create_user(
-        "michelle@whitehouse.gov", "The 44th First Lady"
-    )
-
-
-@pytest.fixture
-def authenticated_client(test_user):
-    client = APIClient()
-    client.force_authenticate(test_user)
-    return client
-
-
-@pytest.fixture
 def image_upload_url():
     def _generate_image_upload_url(recipe_id):
         return reverse("recipe:recipe-upload-image", args=[recipe_id])
 
     return _generate_image_upload_url
-
-
-@pytest.fixture
-def sample_recipe1(test_user):
-    recipe = sample_recipe(user=test_user)
-    yield recipe
-    recipe.image.delete()
-
-
-@pytest.fixture
-def recipe_with_tag_ingredient1(test_user, sample_tag1, sample_ingredient1):
-    recipe = sample_recipe(user=test_user, title="Thai vegetable curry")
-    recipe.tags.add(sample_tag1)
-    recipe.ingredients.add(sample_ingredient1)
-    return recipe
-
-
-@pytest.fixture
-def recipe_with_tag_ingredient2(test_user, sample_tag2, sample_ingredient2):
-    recipe = sample_recipe(user=test_user, title="Aubergine with tahini")
-    recipe.tags.add(sample_tag2)
-    recipe.ingredients.add(sample_ingredient2)
-    return recipe
-
-
-@pytest.fixture
-def sample_tag1(test_user):
-    return sample_tag(user=test_user, name="Vegan")
-
-
-@pytest.fixture
-def sample_tag2(test_user):
-    return sample_tag(user=test_user, name="Vegetarian")
-
-
-@pytest.fixture
-def sample_ingredient1(test_user):
-    return sample_ingredient(user=test_user, name="Curry Powder")
-
-
-@pytest.fixture
-def sample_ingredient2(test_user):
-    return sample_ingredient(user=test_user, name="Eggplant")
-
-
-@pytest.fixture
-def sample_recipe1_serializer(sample_recipe1):
-    return RecipeSerializer(sample_recipe1)
-
-
-@pytest.fixture
-def recipe_with_tag_ingredient1_serializer(recipe_with_tag_ingredient1):
-    return RecipeSerializer(recipe_with_tag_ingredient1)
-
-
-@pytest.fixture
-def recipe_with_tag_ingredient2_serializer(recipe_with_tag_ingredient2):
-    return RecipeSerializer(recipe_with_tag_ingredient2)
-
-
-# HELPER FUNCTIONS
-def sample_recipe(user, **params):
-    """Create and return a sample recipe"""
-    defaults = {"title": "Sample Recipe", "time_minutes": 10, "price": 5.00}
-    defaults.update(params)
-
-    return Recipe.objects.create(user=user, **defaults)
-
-
-def sample_tag(user, name="Main course"):
-    return Tag.objects.create(user=user, name=name)
-
-
-def sample_ingredient(user, name="Cinnamon"):
-    return Ingredient.objects.create(user=user, name=name)
 
 
 # noinspection PyMethodMayBeStatic
@@ -151,11 +48,15 @@ class TestPublicRecipeAPI(object):
         assert res.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-# noinspection PyMethodMayBeStatic
+# noinspection PyMethodMayBeStatic,PyUnusedLocal
 class TestPrivateRecipeAPI(object):
-    def test_retrieve_recipes(self, authenticated_client, test_user, recipes_url):
-        sample_recipe(user=test_user)
-        sample_recipe(user=test_user)
+    def test_retrieve_recipes(
+        self,
+        authenticated_client,
+        recipes_url,
+        recipe_with_tag_ingredient1,
+        recipe_with_tag_ingredient2,
+    ):
 
         res = authenticated_client.get(recipes_url)
 
@@ -167,10 +68,13 @@ class TestPrivateRecipeAPI(object):
         assert res.data == serializer.data
 
     def test_recipes_limited_to_user(
-        self, authenticated_client, test_user, recipes_url, test_user2
+        self,
+        authenticated_client,
+        test_user,
+        recipes_url,
+        user2_recipe,
+        recipe_with_tag_ingredient1,
     ):
-        sample_recipe(user=test_user2)
-        sample_recipe(user=test_user)
 
         res = authenticated_client.get(recipes_url)
 
@@ -181,12 +85,11 @@ class TestPrivateRecipeAPI(object):
         assert len(res.data) == 1
         assert res.data == serializer.data
 
-    def test_view_recipe_detail(self, detail_url, authenticated_client, test_user):
+    def test_view_recipe_detail(
+        self, detail_url, authenticated_client, recipe_with_tag_ingredient1
+    ):
         """Test viewing a recipe detail"""
-        recipe = sample_recipe(user=test_user)
-        recipe.tags.add(sample_tag(user=test_user))
-        recipe.ingredients.add(sample_ingredient(user=test_user))
-
+        recipe = recipe_with_tag_ingredient1
         url = detail_url(recipe.id)
         res = authenticated_client.get(url)
 
@@ -207,14 +110,12 @@ class TestPrivateRecipeAPI(object):
             assert value == getattr(recipe, key)
 
     def test_create_recipe_with_tags(
-        self, authenticated_client, recipes_url, test_user
+        self, authenticated_client, recipes_url, test_user, sample_tag1, sample_tag2
     ):
         """Test creating a recipe with tags"""
-        tag1 = sample_tag(user=test_user, name="Vegan")
-        tag2 = sample_tag(user=test_user, name="Dessert")
         payload = {
             "title": "Avocado Lime Cheesecake",
-            "tags": [tag1.id, tag2.id],
+            "tags": [sample_tag1.id, sample_tag2.id],
             "time_minutes": 60,
             "price": 20.00,
         }
@@ -225,18 +126,21 @@ class TestPrivateRecipeAPI(object):
         recipe = Recipe.objects.get(id=res.data["id"])
         tags = recipe.tags.all()
         assert tags.count() == 2
-        assert tag1 in tags
-        assert tag2 in tags
+        assert sample_tag1 in tags
+        assert sample_tag2 in tags
 
     def test_create_recipe_with_ingredients(
-        self, authenticated_client, recipes_url, test_user
+        self,
+        authenticated_client,
+        recipes_url,
+        test_user,
+        sample_ingredient1,
+        sample_ingredient2,
     ):
         """Test creating a recipe with ingredients"""
-        ingredient1 = sample_ingredient(user=test_user, name="Prawns")
-        ingredient2 = sample_ingredient(user=test_user, name="Ginger")
         payload = {
             "title": "Thai Prawn Red Curry",
-            "ingredients": [ingredient1.id, ingredient2.id],
+            "ingredients": [sample_ingredient1.id, sample_ingredient2.id],
             "time_minutes": 20,
             "price": 7.00,
         }
@@ -247,39 +151,37 @@ class TestPrivateRecipeAPI(object):
         ingredients = recipe.ingredients.all()
 
         assert ingredients.count() == 2
-        assert ingredient2 in ingredients
-        assert ingredient1 in ingredients
+        assert sample_ingredient2 in ingredients
+        assert sample_ingredient1 in ingredients
 
-    def test_partial_update_recipe(self, authenticated_client, detail_url, test_user):
+    def test_partial_update_recipe(
+        self, authenticated_client, detail_url, recipe_with_tag_ingredient1, sample_tag2
+    ):
         """Test updating a recipe with patch"""
-        recipe = sample_recipe(user=test_user)
-        recipe.tags.add(sample_tag(user=test_user))
-        new_tag = sample_tag(user=test_user, name="Curry")
-
-        payload = {"title": "Chicken Tikka", "tags": [new_tag.id]}
-        url = detail_url(recipe.id)
+        payload = {"title": "Chicken Tikka", "tags": [sample_tag2.id]}
+        url = detail_url(recipe_with_tag_ingredient1.id)
         authenticated_client.patch(url, payload)
 
-        recipe.refresh_from_db()
+        recipe_with_tag_ingredient1.refresh_from_db()
 
-        assert recipe.title == payload["title"]
-        tags = recipe.tags.all()
+        assert recipe_with_tag_ingredient1.title == payload["title"]
+        tags = recipe_with_tag_ingredient1.tags.all()
         assert len(tags) == 1
-        assert new_tag in tags
+        assert sample_tag2 in tags
 
-    def test_full_update_recipe(self, authenticated_client, detail_url, test_user):
+    def test_full_update_recipe(
+        self, authenticated_client, detail_url, test_user, recipe_with_tag_ingredient1
+    ):
         """Test updating a recipe with put"""
-        recipe = sample_recipe(user=test_user)
-        recipe.tags.add(sample_tag(user=test_user))
         payload = {"title": "Spaghetti Carbonara", "time_minutes": 25, "price": 5.00}
 
-        authenticated_client.put(detail_url(recipe.id), payload)
-        recipe.refresh_from_db()
+        authenticated_client.put(detail_url(recipe_with_tag_ingredient1.id), payload)
+        recipe_with_tag_ingredient1.refresh_from_db()
 
         for key, value in payload.items():
-            assert value == getattr(recipe, key)
+            assert value == getattr(recipe_with_tag_ingredient1, key)
 
-        assert recipe.tags.all().count() == 0
+        assert recipe_with_tag_ingredient1.tags.all().count() == 0
 
 
 class TestRecipeImageUpload(object):

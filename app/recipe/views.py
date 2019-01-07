@@ -51,7 +51,7 @@ def _params_to_ints(querystring):
 def _filter_on_attr(queryset, attr_params, attr_name):
     if attr_params:
         # generate name of filter programatically
-        filters = {f'{attr_name}__id__in': _params_to_ints(attr_params)}
+        filters = {f"{attr_name}__id__in": _params_to_ints(attr_params)}
         return queryset.filter(**filters)
     return queryset
 

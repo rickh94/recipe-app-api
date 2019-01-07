@@ -1,76 +1,67 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase
+import pytest
 from django.urls import reverse
 from recipe.serializers import TagSerializer
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from core.models import Tag
 
-TAGS_URL = reverse("recipe:tag-list")
+pytestmark = pytest.mark.django_db
 
 
-class PublicTagsAPITests(TestCase):
+@pytest.fixture
+def tags_url():
+    return reverse("recipe:tag-list")
+
+
+class TestPublicTagsAPI(object):
     """Test the publicly available tags API"""
 
-    def setUp(self):
-        self.client = APIClient()
-
-    def test_login_required(self):
+    def test_login_required(self, public_client, tags_url):
         """Test that login is required for retrieving tags"""
-        res = self.client.get(TAGS_URL)
-        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+        res = public_client.get(tags_url)
+        assert res.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-class PrivateTagsAPITests(TestCase):
+# noinspection PyUnusedLocal
+class TestPrivateTagsAPI(object):
     """Test the authorized tags api"""
 
-    def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            "barack@whitehouse.gov", "the 44th president"
-        )
-        self.client = APIClient()
-        self.client.force_authenticate(self.user)
-
-    def test_retrieve_tags(self):
+    def test_retrieve_tags(
+        self, sample_tag1, sample_tag2, tags_url, authenticated_client
+    ):
         """Test retrieving tags"""
-        Tag.objects.create(user=self.user, name="Vegan")
-        Tag.objects.create(user=self.user, name="Dessert")
 
-        res = self.client.get(TAGS_URL)
+        res = authenticated_client.get(tags_url)
 
         tags = Tag.objects.all().order_by("-name")
         serializer = TagSerializer(tags, many=True)
 
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data, serializer.data)
+        assert res.status_code == status.HTTP_200_OK
+        assert res.data == serializer.data
 
-    def test_tags_limited_to_user(self):
+    def test_tags_limited_to_user(
+        self, test_user2, authenticated_client, sample_tag1, user2_tag, tags_url
+    ):
         """Test that tags returned are for the authenticated user"""
-        user2 = get_user_model().objects.create_user(
-            "michelle@whitehouse.gov", "so glad to be done"
-        )
-        Tag.objects.create(user=user2, name="Fruity")
-        tag = Tag.objects.create(user=self.user, name="Comfort Food")
 
-        res = self.client.get(TAGS_URL)
+        res = authenticated_client.get(tags_url)
 
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(res.data), 1)
-        self.assertEqual(res.data[0]["name"], tag.name)
+        assert res.status_code == status.HTTP_200_OK
+        assert len(res.data) == 1
+        assert res.data[0]["name"] == sample_tag1.name
+        assert user2_tag not in res.data
 
-    def test_create_tag_successful(self):
+    def test_create_tag_successful(self, authenticated_client, test_user, tags_url):
         """Test creating a new tag"""
         payload = {"name": "Test tag"}
-        self.client.post(TAGS_URL, payload)
+        authenticated_client.post(tags_url, payload)
 
-        exists = Tag.objects.filter(user=self.user, name=payload["name"]).exists()
+        assert Tag.objects.filter(user=test_user, name=payload["name"]).exists()
 
-        self.assertTrue(exists)
-
-    def test_create_tag_invalid(self):
+    def test_create_tag_invalid(self, authenticated_client, tags_url):
         """Test creating a new tag with invalid payload"""
         payload = {"name": ""}
-        res = self.client.post(TAGS_URL, payload)
+        res = authenticated_client.post(tags_url, payload)
 
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+
