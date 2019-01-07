@@ -7,9 +7,9 @@ import click
 @click.argument("app", default="")
 def cli(app):
     """
-    Run a test coverage report.
+    Make new database migrations
 
-    :param path: Test coverage path
+    :param app: app to make migrations for
     :return: Subprocess call result
     """
     cmd = f'docker-compose run --rm app sh -c "python manage.py makemigrations {app}"'

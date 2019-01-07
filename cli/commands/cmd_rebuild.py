@@ -6,9 +6,9 @@ import click
 @click.command()
 def cli():
     """
-    Shut down docker containers
+    Rebuild the docker container
 
     :return: Subprocess call result
     """
-    cmd = "docker-compose down"
+    cmd = "docker-compose down && docker-compose build"
     return subprocess.call(cmd, shell=True)

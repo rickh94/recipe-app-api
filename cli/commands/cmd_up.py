@@ -6,9 +6,8 @@ import click
 @click.command()
 def cli():
     """
-    Run a test coverage report.
+    Start the docker container
 
-    :param path: Test coverage path
     :return: Subprocess call result
     """
     cmd = "docker-compose up -d"
