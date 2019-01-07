@@ -180,3 +180,34 @@ class TestPrivateRecipeAPI(object):
         assert ingredients.count() == 2
         assert ingredient2 in ingredients
         assert ingredient1 in ingredients
+
+    def test_partial_update_recipe(self, authenticated_client, detail_url, test_user):
+        """Test updating a recipe with patch"""
+        recipe = sample_recipe(user=test_user)
+        recipe.tags.add(sample_tag(user=test_user))
+        new_tag = sample_tag(user=test_user, name="Curry")
+
+        payload = {"title": "Chicken Tikka", "tags": [new_tag.id]}
+        url = detail_url(recipe.id)
+        authenticated_client.patch(url, payload)
+
+        recipe.refresh_from_db()
+
+        assert recipe.title == payload["title"]
+        tags = recipe.tags.all()
+        assert len(tags) == 1
+        assert new_tag in tags
+
+    def test_full_update_recipe(self, authenticated_client, detail_url, test_user):
+        """Test updating a recipe with put"""
+        recipe = sample_recipe(user=test_user)
+        recipe.tags.add(sample_tag(user=test_user))
+        payload = {"title": "Spaghetti Carbonara", "time_minutes": 25, "price": 5.00}
+
+        authenticated_client.put(detail_url(recipe.id), payload)
+        recipe.refresh_from_db()
+
+        for key, value in payload.items():
+            assert value == getattr(recipe, key)
+
+        assert recipe.tags.all().count() == 0
