@@ -43,6 +43,19 @@ class IngredientViewSet(BaseRecipeAttrViewSet):
     serializer_class = serializers.IngredientSerializer
 
 
+def _params_to_ints(querystring):
+    """Convert a list of string iD to a list of integers"""
+    return [int(str_id) for str_id in querystring.split(",")]
+
+
+def _filter_on_attr(queryset, attr_params, attr_name):
+    if attr_params:
+        # generate name of filter programatically
+        filters = {f'{attr_name}__id__in': _params_to_ints(attr_params)}
+        return queryset.filter(**filters)
+    return queryset
+
+
 class RecipeViewSet(viewsets.ModelViewSet, GenericRecipeViewset):
     """Manage recipes in the database"""
 
@@ -53,7 +66,12 @@ class RecipeViewSet(viewsets.ModelViewSet, GenericRecipeViewset):
 
     def get_queryset(self):
         """Retrieve the recipes for the authenticated user"""
-        return self.queryset.filter(user=self.request.user)
+        queryset = self.queryset
+        for attr_name in ["tags", "ingredients"]:
+            attr_params = self.request.query_params.get(attr_name)
+            queryset = _filter_on_attr(queryset, attr_params, attr_name)
+
+        return queryset.filter(user=self.request.user)
 
     def get_serializer_class(self):
         """Return needed serializer class"""

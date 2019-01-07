@@ -74,6 +74,57 @@ def sample_recipe1(test_user):
     recipe.image.delete()
 
 
+@pytest.fixture
+def recipe_with_tag_ingredient1(test_user, sample_tag1, sample_ingredient1):
+    recipe = sample_recipe(user=test_user, title="Thai vegetable curry")
+    recipe.tags.add(sample_tag1)
+    recipe.ingredients.add(sample_ingredient1)
+    return recipe
+
+
+@pytest.fixture
+def recipe_with_tag_ingredient2(test_user, sample_tag2, sample_ingredient2):
+    recipe = sample_recipe(user=test_user, title="Aubergine with tahini")
+    recipe.tags.add(sample_tag2)
+    recipe.ingredients.add(sample_ingredient2)
+    return recipe
+
+
+@pytest.fixture
+def sample_tag1(test_user):
+    return sample_tag(user=test_user, name="Vegan")
+
+
+@pytest.fixture
+def sample_tag2(test_user):
+    return sample_tag(user=test_user, name="Vegetarian")
+
+
+@pytest.fixture
+def sample_ingredient1(test_user):
+    return sample_ingredient(user=test_user, name="Curry Powder")
+
+
+@pytest.fixture
+def sample_ingredient2(test_user):
+    return sample_ingredient(user=test_user, name="Eggplant")
+
+
+@pytest.fixture
+def sample_recipe1_serializer(sample_recipe1):
+    return RecipeSerializer(sample_recipe1)
+
+
+@pytest.fixture
+def recipe_with_tag_ingredient1_serializer(recipe_with_tag_ingredient1):
+    return RecipeSerializer(recipe_with_tag_ingredient1)
+
+
+@pytest.fixture
+def recipe_with_tag_ingredient2_serializer(recipe_with_tag_ingredient2):
+    return RecipeSerializer(recipe_with_tag_ingredient2)
+
+
 # HELPER FUNCTIONS
 def sample_recipe(user, **params):
     """Create and return a sample recipe"""
@@ -261,3 +312,42 @@ class TestRecipeImageUpload(object):
         res = authenticated_client.post(url, {"image": "notimage"}, format="multipart")
 
         assert res.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_filter_recipes_by_tags(
+        self,
+        sample_recipe1_serializer,
+        recipe_with_tag_ingredient1_serializer,
+        recipe_with_tag_ingredient2_serializer,
+        sample_tag1,
+        sample_tag2,
+        authenticated_client,
+        recipes_url,
+    ):
+        """Test returning recipes with specific tags"""
+        res = authenticated_client.get(
+            recipes_url, {"tags": f"{sample_tag1.id},{sample_tag2.id}"}
+        )
+
+        assert recipe_with_tag_ingredient1_serializer.data in res.data
+        assert recipe_with_tag_ingredient2_serializer.data in res.data
+        assert sample_recipe1_serializer.data not in res.data
+
+    def test_filter_recipes_by_ingredients(
+        self,
+        sample_recipe1_serializer,
+        recipe_with_tag_ingredient1_serializer,
+        recipe_with_tag_ingredient2_serializer,
+        sample_ingredient1,
+        sample_ingredient2,
+        authenticated_client,
+        recipes_url,
+    ):
+        """Test returning recipes with specific ingredients"""
+        res = authenticated_client.get(
+            recipes_url,
+            {"ingredients": f"{sample_ingredient1.id},{sample_ingredient2.id}"},
+        )
+
+        assert recipe_with_tag_ingredient1_serializer.data in res.data
+        assert recipe_with_tag_ingredient2_serializer.data in res.data
+        assert sample_recipe1_serializer.data not in res.data
