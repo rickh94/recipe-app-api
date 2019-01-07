@@ -53,9 +53,9 @@ class ModelTests(TestCase):
         """Test the recipe string representation"""
         recipe = models.Recipe.objects.create(
             user=sample_user(),
-            title='Steak and Mushroom Sauce',
+            title="Steak and Mushroom Sauce",
             time_minutes=5,
-            price=5.00
+            price=5.00,
         )
 
         assert str(recipe) == recipe.title
