@@ -6,7 +6,7 @@ from core.models import Tag, Ingredient, Recipe
 from recipe import serializers
 
 
-class AuthenticatedViewSet(viewsets.GenericViewSet):
+class GenericRecipeViewset(viewsets.GenericViewSet):
     """Mixin for custom authentication options"""
 
     authentication_classes = (TokenAuthentication,)
@@ -14,7 +14,7 @@ class AuthenticatedViewSet(viewsets.GenericViewSet):
 
 
 class BaseRecipeAttrViewSet(
-    mixins.ListModelMixin, mixins.CreateModelMixin, AuthenticatedViewSet
+    mixins.ListModelMixin, mixins.CreateModelMixin, GenericRecipeViewset
 ):
     """Base ViewSet for user owned recipe attributes"""
 
@@ -41,7 +41,7 @@ class IngredientViewSet(BaseRecipeAttrViewSet):
     serializer_class = serializers.IngredientSerializer
 
 
-class RecipeViewSet(viewsets.ModelViewSet, AuthenticatedViewSet):
+class RecipeViewSet(viewsets.ModelViewSet, GenericRecipeViewset):
     """Manage recipes in the database"""
 
     serializer_class = serializers.RecipeSerializer
@@ -59,3 +59,7 @@ class RecipeViewSet(viewsets.ModelViewSet, AuthenticatedViewSet):
             return serializers.RecipeDetailSerializer
 
         return self.serializer_class
+
+    def perform_create(self, serializer):
+        """Create a new recipe"""
+        serializer.save(user=self.request.user)
