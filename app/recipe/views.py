@@ -8,7 +8,7 @@ from core.models import Tag, Ingredient, Recipe
 from recipe import serializers
 
 
-class GenericRecipeViewset(viewsets.GenericViewSet):
+class GenericRecipeViewSet(viewsets.GenericViewSet):
     """Mixin for custom authentication options"""
 
     authentication_classes = (TokenAuthentication,)
@@ -16,13 +16,18 @@ class GenericRecipeViewset(viewsets.GenericViewSet):
 
 
 class BaseRecipeAttrViewSet(
-    mixins.ListModelMixin, mixins.CreateModelMixin, GenericRecipeViewset
+    mixins.ListModelMixin, mixins.CreateModelMixin, GenericRecipeViewSet
 ):
     """Base ViewSet for user owned recipe attributes"""
 
     def get_queryset(self):
         """Return objects for the current authenticated user only"""
-        return self.queryset.filter(user=self.request.user).order_by("-name")
+        assigned_only = bool(self.request.query_params.get("assigned_only"))
+        queryset = self.queryset
+        if assigned_only:
+            queryset = queryset.filter(recipe__isnull=False)
+
+        return queryset.filter(user=self.request.user).order_by("-name")
 
     def perform_create(self, serializer):
         """Create a new object"""
@@ -56,7 +61,7 @@ def _filter_on_attr(queryset, attr_params, attr_name):
     return queryset
 
 
-class RecipeViewSet(viewsets.ModelViewSet, GenericRecipeViewset):
+class RecipeViewSet(viewsets.ModelViewSet, GenericRecipeViewSet):
     """Manage recipes in the database"""
 
     serializer_class = serializers.RecipeSerializer

@@ -1,45 +1,42 @@
-from django.contrib.auth import get_user_model
+import pytest
 from django.urls import reverse
-from django.test import TestCase
 
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from core.models import Ingredient
 
 from recipe.serializers import IngredientSerializer
 
-INGREDIENTS_URL = reverse("recipe:ingredient-list")
+pytestmark = pytest.mark.django_db
 
 
-class PublicIngredientsAPITests(TestCase):
+@pytest.fixture
+def ingredients_url():
+    return reverse("recipe:ingredient-list")
+
+
+class TestPublicIngredientsAPI(object):
     """Test the publicly available ingredients api"""
 
-    def setUp(self):
-        self.client = APIClient()
-
-    def test_login_required(self):
+    def test_login_required(self, public_client, ingredients_url):
         """Test that login is required to access the endpoint"""
-        res = self.client.get(INGREDIENTS_URL)
-        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+        res = public_client.get(ingredients_url)
+        assert res.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-class PrivateIngredientsAPITests(TestCase):
+# noinspection PyUnusedLocal
+class TestPrivateIngredientsAPI(object):
     """Test the private ingredients API"""
 
-    def setUp(self):
-        self.client = APIClient()
-        self.user = get_user_model().objects.create_user(
-            "barack@whitehouse.gov", "The 44th President"
-        )
-        self.client.force_authenticate(self.user)
-
-    def test_retrieve_ingredient_list(self):
+    def test_retrieve_ingredient_list(
+        self,
+        authenticated_client,
+        sample_ingredient1,
+        sample_ingredient2,
+        ingredients_url,
+    ):
         """Test retrieving a list of ingredients"""
-        Ingredient.objects.create(user=self.user, name="Spinach")
-        Ingredient.objects.create(user=self.user, name="Salt")
-
-        res = self.client.get(INGREDIENTS_URL)
+        res = authenticated_client.get(ingredients_url)
 
         ingredients = Ingredient.objects.all().order_by("-name")
         serializer = IngredientSerializer(ingredients, many=True)
@@ -47,31 +44,51 @@ class PrivateIngredientsAPITests(TestCase):
         assert res.status_code == status.HTTP_200_OK
         assert res.data == serializer.data
 
-    def test_ingredients_limited_to_user(self):
+    def test_ingredients_limited_to_user(
+        self,
+        sample_ingredient1,
+        user2_ingredient,
+        authenticated_client,
+        ingredients_url,
+    ):
         """Test that only ingredients for the authenticated user are returned"""
-        user2 = get_user_model().objects.create_user(
-            "michelle@whitehouse.gov", "get me out of here"
-        )
-        Ingredient.objects.create(user=user2, name="Vinegar")
-
-        ingredient = Ingredient.objects.create(user=self.user, name="Turmeric")
-
-        res = self.client.get(INGREDIENTS_URL)
+        res = authenticated_client.get(ingredients_url)
 
         assert res.status_code == status.HTTP_200_OK
         assert len(res.data) == 1
-        assert res.data[0]["name"] == ingredient.name
+        assert res.data[0]["name"] == sample_ingredient1.name
 
-    def test_create_ingredient_successful(self):
+    def test_create_ingredient_successful(
+        self, authenticated_client, ingredients_url, test_user
+    ):
         """Test create a new ingredient"""
         payload = {"name": "Cabbage"}
-        self.client.post(INGREDIENTS_URL, payload)
+        authenticated_client.post(ingredients_url, payload)
 
-        assert Ingredient.objects.filter(user=self.user, name=payload["name"]).exists()
+        assert Ingredient.objects.filter(user=test_user, name=payload["name"]).exists()
 
-    def test_create_ingredient_invalid(self):
+    def test_create_ingredient_invalid(self, authenticated_client, ingredients_url):
         """Test creating invalid ingredient fails"""
         payload = {"name": ""}
-        res = self.client.post(INGREDIENTS_URL, payload)
+        res = authenticated_client.post(ingredients_url, payload)
 
         assert res.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_retrieve_ingredients_assigned_to_recipes(
+        self,
+        sample_ingredient1,
+        recipe_with_tag_ingredient1,
+        unassigned_ingredient,
+        authenticated_client,
+        ingredients_url,
+    ):
+        """Test filtering ingredients by those assigned to recipes"""
+        res = authenticated_client.get(ingredients_url, {"assigned_only": 1})
+
+        assigned_serializer = IngredientSerializer(sample_ingredient1)
+        unassigned_serializer = IngredientSerializer(unassigned_ingredient)
+
+        assert assigned_serializer.data in res.data, "Should return assigned ingredient"
+        assert (
+            unassigned_serializer.data not in res.data
+        ), "Should not return unassigned ingredient"

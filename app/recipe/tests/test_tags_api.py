@@ -65,3 +65,21 @@ class TestPrivateTagsAPI(object):
 
         assert res.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_retrieve_tags_assigned_to_recipes(
+        self,
+        sample_tag1,
+        unassigned_tag,
+        recipe_with_tag_ingredient1,
+        authenticated_client,
+        tags_url,
+    ):
+        """Test filtering tags by those assigned to recipes"""
+        res = authenticated_client.get(tags_url, {"assigned_only": 1})
+
+        assigned_serializer = TagSerializer(sample_tag1)
+        unassigned_serializer = TagSerializer(unassigned_tag)
+
+        assert assigned_serializer.data in res.data, "Should return assigned ingredient"
+        assert (
+            unassigned_serializer.data not in res.data
+        ), "Should not return unassigned ingredient"
