@@ -12,9 +12,10 @@ RUN apk del .tmp-build-deps
 
 RUN mkdir /app
 WORKDIR /app
-COPY ./app /app
+#COPY ./app /app
 
-RUN mkdir -p /vol/web/{media,static}
+RUN mkdir -p /vol/web/media
+RUN mkdir -p /vol/web/static
 RUN adduser -D user
 RUN chown -R user:user /vol/
 RUN chmod -R a+rX /vol/web

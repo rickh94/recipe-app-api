@@ -5,12 +5,13 @@ import click
 
 
 @click.command()
-def cli():
+@click.argument("service")
+def cli(service):
     """
     Start the docker container
 
     :return: Subprocess call result
     """
 
-    cmd = "docker-compose up -d"
+    cmd = f"docker-compose restart {service}"
     return subprocess.call(cmd, shell=True)

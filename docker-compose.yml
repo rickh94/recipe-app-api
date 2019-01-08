@@ -1,28 +1,78 @@
 version: "3"
 
 services:
+  # two webserver instances and two app instances to test persistence of authentication
+  nginx:
+    image: nginx:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config/nginx:/etc/nginx/conf.d
+      - ./vol:/vol
+    depends_on:
+      - app
+
+  nginx2:
+    image: nginx:latest
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./config/nginx2:/etc/nginx/conf.d
+      - ./vol:/vol
+    depends_on:
+      - app
+
   app:
     build:
       context: .
     volumes:
       - ./app:/app
-    ports:
-      - 8000:8000
+      - ./vol:/vol
     command: >
       sh -c "python manage.py wait_for_db && 
              python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+             python manage.py collectstatic -c --noinput &&
+             gunicorn app.wsgi --bind 0.0.0.0:8000"
     environment:
-      - DB_HOST=db
-      - DB_NAME=app
-      - DB_USER=postgres
-      - DB_PASS=supersecretpassword
+      - SECRET_KEY
+      - DEBUG
+      - ALLOWED_HOSTS
+      - DATABASE_URL
+      - DB_HOST
+      - DB_USER
+      - DB_NAME
+      - POSTGRES_PASSWORD
     depends_on:
       - db
+    expose:
+      - "8000"
+
+  app2:
+    build:
+      context: .
+    volumes:
+      - ./app:/app
+      - ./vol:/vol
+    command: >
+      sh -c "python manage.py wait_for_db &&
+             gunicorn app.wsgi --bind 0.0.0.0:8001"
+    environment:
+      - SECRET_KEY
+      - DEBUG
+      - ALLOWED_HOSTS
+      - DATABASE_URL
+      - DB_HOST
+      - DB_USER
+      - DB_NAME
+      - POSTGRES_PASSWORD
+    depends_on:
+      - db
+    expose:
+      - "8001"
 
   db:
     image: postgres:10-alpine
     environment:
       - POSTGRES_DB=app
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=supersecretpassword
+      - POSTGRES_PASSWORD
