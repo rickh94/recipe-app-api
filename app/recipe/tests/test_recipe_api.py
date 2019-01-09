@@ -1,4 +1,5 @@
 import os
+from unittest import mock
 
 from PIL import Image
 import pytest
@@ -183,23 +184,9 @@ class TestPrivateRecipeAPI(object):
         assert recipe_with_tag_ingredient1.tags.all().count() == 0
 
 
-@pytest.fixture
-def fake_image_path(tmp_path):
-    def _image_path(_instance, filename):
-        return tmp_path / filename
-
-    return _image_path
-
-
 class TestRecipeImageUpload(object):
     def test_upload_image_to_recipe(
-        self,
-        sample_recipe1,
-        authenticated_client,
-        image_upload_url,
-        tmp_path,
-        monkeypatch,
-        fake_image_path,
+        self, sample_recipe1, authenticated_client, image_upload_url, tmp_path
     ):
         """Test uploading image to recipe"""
         url = image_upload_url(sample_recipe1.id)
@@ -209,7 +196,6 @@ class TestRecipeImageUpload(object):
             img.save(the_image, format="JPEG")
 
         with ntf.open("rb") as the_image:
-            monkeypatch.setattr("core.models.recipe_image_file_path", fake_image_path)
             res = authenticated_client.post(
                 url, {"image": the_image}, format="multipart"
             )

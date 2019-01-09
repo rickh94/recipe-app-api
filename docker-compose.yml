@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     volumes:
       - ./config/nginx:/etc/nginx/conf.d
-      - ./vol:/vol
+      - web-files:/vol/web
     depends_on:
       - app
 
@@ -18,7 +18,7 @@ services:
       - "8001:8001"
     volumes:
       - ./config/nginx2:/etc/nginx/conf.d
-      - ./vol:/vol
+      - web-files:/vol/web
     depends_on:
       - app
 
@@ -27,7 +27,7 @@ services:
       context: .
     volumes:
       - ./app:/app
-      - ./vol:/vol
+      - web-files:/vol/web
     command: >
       sh -c "python manage.py wait_for_db && 
              python manage.py migrate &&
@@ -52,7 +52,7 @@ services:
       context: .
     volumes:
       - ./app:/app
-      - ./vol:/vol
+      - web-files:/vol/web
     command: >
       sh -c "python manage.py wait_for_db &&
              gunicorn app.wsgi --bind 0.0.0.0:8001"
@@ -76,3 +76,6 @@ services:
       - POSTGRES_DB=app
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD
+
+volumes:
+  web-files:
