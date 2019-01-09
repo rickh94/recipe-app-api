@@ -1,12 +1,6 @@
 language: python
 env:
-  - SECRET_KEY=testsecretkey
-  - ALLOWED_HOSTS=localhost,app
-  - DEBUG=False
-  - DB_HOST=db
-  - DB_USER=postgres
-  - DB_NAME=app
-  - POSTGRES_PASSWORD=testdbpass
+  - SECRET_KEY=testsecretkey ALLOWED_HOSTS=localhost,app DEBUG=False DB_HOST=db DB_USER=postgres DB_NAME=app POSTGRES_PASSWORD=testdbpass
 python:
   - "3.6"
 
@@ -15,7 +9,7 @@ services:
 
 before_script:
   - pip install docker-compose
-  - cp .env.test .env
+  # - cp .env.test .env
 
 script:
   - docker-compose run app sh -c "pytest --disable-pytest-warnings && flake8"
