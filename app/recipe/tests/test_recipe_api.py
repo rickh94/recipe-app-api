@@ -1,5 +1,4 @@
 import os
-from unittest import mock
 
 from PIL import Image
 import pytest
