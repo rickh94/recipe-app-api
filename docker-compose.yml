@@ -1,13 +1,15 @@
 version: "3"
 
 services:
-  # two webserver instances and two app instances to test persistence of authentication
+  # two webserver instances and two app instances to test compatibility with high availability
   nginx:
     image: nginx:latest
     ports:
       - "8000:8000"
+      - "8443:8443"
     volumes:
       - ./config/nginx:/etc/nginx/conf.d
+      - ./config/certs:/etc/nginx/ssl
       - web-files:/vol/web
     depends_on:
       - app
@@ -16,8 +18,10 @@ services:
     image: nginx:latest
     ports:
       - "8001:8001"
+      - "8444:8444"
     volumes:
       - ./config/nginx2:/etc/nginx/conf.d
+      - ./config/certs:/etc/nginx/ssl
       - web-files:/vol/web
     depends_on:
       - app
