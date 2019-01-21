@@ -1,9 +1,8 @@
 import pytest
+from core.models import Tag
 from django.urls import reverse
 from recipe.serializers import TagSerializer
 from rest_framework import status
-
-from core.models import Tag
 
 pytestmark = pytest.mark.django_db
 

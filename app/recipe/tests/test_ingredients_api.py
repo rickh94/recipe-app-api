@@ -1,11 +1,8 @@
 import pytest
-from django.urls import reverse
-
-from rest_framework import status
-
 from core.models import Ingredient
-
+from django.urls import reverse
 from recipe.serializers import IngredientSerializer
+from rest_framework import status
 
 pytestmark = pytest.mark.django_db
 

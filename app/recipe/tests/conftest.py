@@ -1,9 +1,8 @@
 import pytest
+from core.models import Ingredient, Recipe, Tag
 from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
-
-from core.models import Recipe, Tag, Ingredient
 from recipe.serializers import RecipeSerializer
+from rest_framework.test import APIClient
 
 
 # ----------------------- USERS ----------------------------
